@@ -1,0 +1,17 @@
+{
+  "name": "memory-mcp",
+  "version": "1.0.0",
+  "description": "Claude MCP 记忆库服务",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "mcp": "node server.js",
+    "web": "node web.js",
+    "mcp-sse": "node mcp-sse.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.5.0",
+    "express": "^4.21.0",
+    "pg": "^8.20.0"
+  }
+}

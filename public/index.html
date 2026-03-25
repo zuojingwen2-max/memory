@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>记忆库</title>
+<style>
+:root {
+  --bg: #f5f4f0;
+  --surface: #ffffff;
+  --surface2: #f0ede8;
+  --border: #e0ddd8;
+  --text: #2c2c2c;
+  --muted: #999;
+  --radius: 12px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.07);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.14);
+  --deep: #7c3aed; --deep-bg: #f3f0ff;
+  --daily: #ea580c; --daily-bg: #fff5f0;
+  --diary: #db2777; --diary-bg: #fff0f7;
+  --knowledge: #059669; --knowledge-bg: #f0fdf4;
+  --happy: #22c55e; --sad: #3b82f6;
+  --calm: #94a3b8; --excited: #f59e0b; --anxious: #ef4444;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100vh; font-size: 14px; line-height: 1.6;
+}
+
+/* ── Header ── */
+header {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 0 24px; height: 58px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+}
+.logo { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+.header-actions { display: flex; gap: 8px; }
+
+/* ── Buttons ── */
+.btn {
+  padding: 7px 16px; border: none; border-radius: 8px;
+  cursor: pointer; font-size: 13px; font-weight: 500;
+  transition: all .15s; font-family: inherit;
+}
+.btn-primary { background: var(--text); color: white; }
+.btn-primary:hover { background: #444; }
+.btn-ghost { background: transparent; color: var(--text); }
+.btn-ghost:hover { background: var(--surface2); }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+
+/* ── Filter bar ── */
+.filter-bar {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 0 24px; display: flex; align-items: center; gap: 12px; height: 50px;
+}
+.cat-tabs { display: flex; gap: 3px; flex: 1; }
+.cat-tab {
+  padding: 5px 13px; border-radius: 20px; border: none;
+  background: transparent; cursor: pointer; font-size: 13px;
+  color: var(--muted); transition: all .15s; font-weight: 500;
+  display: flex; align-items: center; gap: 4px; font-family: inherit;
+}
+.cat-tab:hover { background: var(--surface2); color: var(--text); }
+.cat-tab.active { background: var(--text); color: white; }
+.cat-tab[data-cat="deep"].active   { background: var(--deep); }
+.cat-tab[data-cat="daily"].active  { background: var(--daily); }
+.cat-tab[data-cat="diary"].active  { background: var(--diary); }
+.cat-tab[data-cat="knowledge"].active { background: var(--knowledge); }
+.count-badge {
+  background: rgba(0,0,0,0.1); color: inherit;
+  border-radius: 9px; font-size: 11px; padding: 0 5px; min-width: 18px;
+  text-align: center; line-height: 18px;
+}
+.cat-tab.active .count-badge { background: rgba(255,255,255,0.25); }
+.view-toggle {
+  display: flex; background: var(--surface2); border-radius: 8px; padding: 3px; gap: 2px;
+}
+.view-btn {
+  padding: 4px 12px; border: none; border-radius: 6px; cursor: pointer;
+  font-size: 12px; background: transparent; color: var(--muted);
+  transition: all .15s; font-weight: 500; font-family: inherit;
+}
+.view-btn.active { background: white; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+.search-wrap { position: relative; }
+.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 13px; pointer-events: none; }
+.search-input {
+  padding: 7px 12px 7px 32px; border: 1px solid var(--border);
+  border-radius: 8px; background: var(--surface2); font-size: 13px;
+  width: 180px; outline: none; transition: all .15s; font-family: inherit;
+}
+.search-input:focus { border-color: #aaa; background: white; width: 220px; }
+
+/* ── Main ── */
+main { max-width: 780px; margin: 0 auto; padding: 24px; }
+
+/* ── Memory Cards ── */
+.memory-grid { display: flex; flex-direction: column; gap: 10px; }
+.memory-card {
+  background: var(--surface); border-radius: var(--radius);
+  padding: 16px 20px; border: 1px solid var(--border);
+  transition: box-shadow .15s;
+}
+.memory-card:hover { box-shadow: var(--shadow); }
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.cat-badge {
+  padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; letter-spacing: .3px;
+}
+.cat-badge.deep      { background: var(--deep-bg);      color: var(--deep); }
+.cat-badge.daily     { background: var(--daily-bg);     color: var(--daily); }
+.cat-badge.diary     { background: var(--diary-bg);     color: var(--diary); }
+.cat-badge.knowledge { background: var(--knowledge-bg); color: var(--knowledge); }
+.card-meta { display: flex; align-items: center; gap: 8px; }
+.card-time { font-size: 12px; color: var(--muted); }
+.card-actions { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
+.memory-card:hover .card-actions { opacity: 1; }
+.icon-btn {
+  width: 28px; height: 28px; border: none; border-radius: 6px;
+  background: transparent; cursor: pointer; color: var(--muted); font-size: 13px;
+  display: flex; align-items: center; justify-content: center; transition: all .15s;
+}
+.icon-btn:hover { background: var(--surface2); color: var(--text); }
+.icon-btn.danger:hover { background: #fee2e2; color: #ef4444; }
+.card-content { font-size: 14px; line-height: 1.75; white-space: pre-wrap; word-break: break-word; }
+.card-footer { display: flex; align-items: center; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+.tag { padding: 2px 8px; background: var(--surface2); border-radius: 6px; font-size: 11px; color: var(--muted); }
+.source-badge { padding: 2px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 11px; color: var(--muted); }
+.mood-badge { padding: 2px 9px; border-radius: 6px; font-size: 11px; font-weight: 500; }
+.mood-badge.happy   { background: #dcfce7; color: #15803d; }
+.mood-badge.sad     { background: #dbeafe; color: #1d4ed8; }
+.mood-badge.calm    { background: #f1f5f9; color: #64748b; }
+.mood-badge.excited { background: #fef3c7; color: #b45309; }
+.mood-badge.anxious { background: #fee2e2; color: #dc2626; }
+.expires-badge { padding: 2px 8px; background: var(--daily-bg); border-radius: 6px; font-size: 11px; color: var(--daily); }
+
+/* ── Empty / Loading ── */
+.empty-state { text-align: center; padding: 64px 24px; color: var(--muted); }
+.empty-state .ei { font-size: 44px; margin-bottom: 14px; }
+.empty-state p { font-size: 15px; }
+.loading { text-align: center; padding: 48px; color: var(--muted); font-size: 13px; }
+
+/* ── Calendar ── */
+.calendar-wrap {
+  background: var(--surface); border-radius: var(--radius);
+  border: 1px solid var(--border); overflow: hidden;
+}
+.cal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 24px 16px; border-bottom: 1px solid var(--border);
+}
+.cal-title { font-size: 16px; font-weight: 700; }
+.cal-nav {
+  width: 32px; height: 32px; border: 1px solid var(--border);
+  border-radius: 8px; background: transparent; cursor: pointer;
+  font-size: 16px; display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.cal-nav:hover { background: var(--surface2); }
+.cal-legend {
+  display: flex; gap: 16px; padding: 12px 24px; border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.dot-s { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dot-s.happy   { background: var(--happy); }
+.dot-s.sad     { background: var(--sad); }
+.dot-s.calm    { background: var(--calm); }
+.dot-s.excited { background: var(--excited); }
+.dot-s.anxious { background: var(--anxious); }
+.dot-s.none    { background: var(--diary); }
+.cal-weekdays {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  text-align: center; padding: 10px 16px 2px; gap: 4px;
+}
+.cal-weekday { font-size: 12px; color: var(--muted); font-weight: 500; padding: 4px 0; }
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 4px; padding: 4px 16px 20px;
+}
+.cal-cell {
+  aspect-ratio: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  border-radius: 8px; cursor: default; transition: background .15s;
+  gap: 3px; min-height: 42px;
+}
+.cal-cell.has-diary { cursor: pointer; }
+.cal-cell.has-diary:hover { background: var(--surface2); }
+.cal-day-num {
+  font-size: 13px; font-weight: 500; line-height: 1;
+  width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+}
+.cal-cell.today .cal-day-num { background: var(--text); color: white; }
+.mood-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.mood-dot.happy   { background: var(--happy); }
+.mood-dot.sad     { background: var(--sad); }
+.mood-dot.calm    { background: var(--calm); }
+.mood-dot.excited { background: var(--excited); }
+.mood-dot.anxious { background: var(--anxious); }
+.mood-dot.none    { background: var(--diary); }
+
+/* ── Modals ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.42);
+  z-index: 200; display: flex; align-items: center; justify-content: center;
+  padding: 24px; opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal-box {
+  background: white; border-radius: 16px; padding: 28px;
+  width: 100%; max-width: 520px; box-shadow: var(--shadow-lg);
+  transform: translateY(12px); transition: transform .2s;
+  max-height: 90vh; overflow-y: auto;
+}
+.modal-overlay.open .modal-box { transform: translateY(0); }
+.modal-box.wide { max-width: 620px; }
+.modal-title { font-size: 17px; font-weight: 700; margin-bottom: 22px; }
+
+/* ── Form ── */
+.form-group { margin-bottom: 16px; }
+label {
+  display: block; font-size: 11px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;
+}
+input[type="text"], textarea, select {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--border);
+  border-radius: 8px; font-size: 14px; font-family: inherit;
+  background: var(--surface2); color: var(--text); outline: none; transition: border-color .15s;
+}
+input[type="text"]:focus, textarea:focus, select:focus { border-color: #aaa; background: white; }
+textarea { resize: vertical; min-height: 110px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+
+/* ── Mood selector ── */
+.mood-select { display: flex; gap: 6px; flex-wrap: wrap; }
+.mood-opt {
+  padding: 6px 12px; border: 2px solid var(--border); border-radius: 20px;
+  cursor: pointer; font-size: 12px; transition: all .15s;
+  background: transparent; font-family: inherit;
+}
+.mood-opt:hover { border-color: #aaa; }
+.mood-opt.happy   { color: #15803d; } .mood-opt.happy.sel   { background: #dcfce7; border-color: var(--happy); }
+.mood-opt.sad     { color: #1d4ed8; } .mood-opt.sad.sel     { background: #dbeafe; border-color: var(--sad); }
+.mood-opt.calm    { color: #64748b; } .mood-opt.calm.sel    { background: #f1f5f9; border-color: var(--calm); }
+.mood-opt.excited { color: #b45309; } .mood-opt.excited.sel { background: #fef3c7; border-color: var(--excited); }
+.mood-opt.anxious { color: #dc2626; } .mood-opt.anxious.sel { background: #fee2e2; border-color: var(--anxious); }
+
+/* ── Stats ── */
+.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+.stat-card { padding: 14px; background: var(--surface2); border-radius: var(--radius); text-align: center; }
+.stat-num { font-size: 26px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+.stat-label { font-size: 12px; color: var(--muted); }
+.tags-cloud { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ── Diary view ── */
+.diary-entry { margin-bottom: 20px; padding-bottom: 20px; }
+.diary-entry + .diary-entry { border-top: 1px solid var(--border); padding-top: 20px; }
+.diary-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.diary-time { font-size: 12px; color: var(--muted); }
+.diary-body { font-size: 15px; line-height: 1.9; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🧠 记忆库</div>
+  <div class="header-actions">
+    <button class="btn btn-ghost" onclick="openStats()">统计</button>
+    <button class="btn btn-primary" onclick="openWrite()">＋ 写入记忆</button>
+  </div>
+</header>
+
+<div class="filter-bar">
+  <div class="cat-tabs">
+    <button class="cat-tab active" data-cat=""          onclick="setCategory(this,'')">全部 <span class="count-badge" id="ct-all">0</span></button>
+    <button class="cat-tab"        data-cat="deep"      onclick="setCategory(this,'deep')">深层 <span class="count-badge" id="ct-deep">0</span></button>
+    <button class="cat-tab"        data-cat="daily"     onclick="setCategory(this,'daily')">日常 <span class="count-badge" id="ct-daily">0</span></button>
+    <button class="cat-tab"        data-cat="diary"     onclick="setCategory(this,'diary')">日记 <span class="count-badge" id="ct-diary">0</span></button>
+    <button class="cat-tab"        data-cat="knowledge" onclick="setCategory(this,'knowledge')">知识 <span class="count-badge" id="ct-knowledge">0</span></button>
+  </div>
+  <div class="view-toggle">
+    <button class="view-btn active" onclick="setView(this,'list')">列表</button>
+    <button class="view-btn"        onclick="setView(this,'calendar')">日历</button>
+  </div>
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input class="search-input" type="text" placeholder="搜索记忆…" oninput="debounceSearch(this.value)">
+  </div>
+</div>
+
+<main>
+  <!-- List -->
+  <div id="list-view">
+    <div id="memory-list" class="memory-grid"><div class="loading">加载中…</div></div>
+  </div>
+
+  <!-- Calendar -->
+  <div id="calendar-view" style="display:none">
+    <div class="calendar-wrap">
+      <div class="cal-header">
+        <button class="cal-nav" onclick="calNav(-1)">‹</button>
+        <span class="cal-title" id="cal-title"></span>
+        <button class="cal-nav" onclick="calNav(1)">›</button>
+      </div>
+      <div class="cal-legend">
+        <div class="legend-item"><span class="dot-s happy"></span>开心</div>
+        <div class="legend-item"><span class="dot-s sad"></span>难过</div>
+        <div class="legend-item"><span class="dot-s calm"></span>平静</div>
+        <div class="legend-item"><span class="dot-s excited"></span>兴奋</div>
+        <div class="legend-item"><span class="dot-s anxious"></span>焦虑</div>
+        <div class="legend-item"><span class="dot-s none"></span>未标注</div>
+      </div>
+      <div class="cal-weekdays">
+        <div class="cal-weekday">一</div><div class="cal-weekday">二</div>
+        <div class="cal-weekday">三</div><div class="cal-weekday">四</div>
+        <div class="cal-weekday">五</div><div class="cal-weekday">六</div>
+        <div class="cal-weekday">日</div>
+      </div>
+      <div id="cal-grid" class="cal-grid"></div>
+    </div>
+  </div>
+</main>
+
+<!-- ── Write / Edit Modal ── -->
+<div class="modal-overlay" id="write-modal" onclick="overlayClick(event,'write-modal')">
+  <div class="modal-box">
+    <div class="modal-title" id="write-title">写入记忆</div>
+    <input type="hidden" id="edit-id">
+    <div class="form-group">
+      <label>内容</label>
+      <textarea id="f-content" placeholder="在这里写下你想记住的…"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>分类</label>
+        <select id="f-category" onchange="onCategoryChange()">
+          <option value="deep">深层 — 身份与规则</option>
+          <option value="daily">日常 — 近期事件</option>
+          <option value="diary">日记 — 今日感受</option>
+          <option value="knowledge">知识 — 学到的东西</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>来源</label>
+        <input type="text" id="f-source" value="web" placeholder="web / user / conversation">
+      </div>
+    </div>
+    <div class="form-group" id="mood-group" style="display:none">
+      <label>今日心情</label>
+      <div class="mood-select">
+        <button class="mood-opt happy"   onclick="pickMood('happy')">😊 开心</button>
+        <button class="mood-opt sad"     onclick="pickMood('sad')">😢 难过</button>
+        <button class="mood-opt calm"    onclick="pickMood('calm')">😌 平静</button>
+        <button class="mood-opt excited" onclick="pickMood('excited')">🤩 兴奋</button>
+        <button class="mood-opt anxious" onclick="pickMood('anxious')">😰 焦虑</button>
+      </div>
+    </div>
+    <div class="form-group" id="expires-group" style="display:none">
+      <label>过期天数</label>
+      <input type="text" id="f-expires" value="7" placeholder="7">
+    </div>
+    <div class="form-group">
+      <label>标签（逗号分隔）</label>
+      <input type="text" id="f-tags" placeholder="例：工作, 重要, 2026">
+    </div>
+    <div class="form-footer">
+      <button class="btn btn-ghost" onclick="closeModal('write-modal')">取消</button>
+      <button class="btn btn-primary" onclick="submitMemory()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Diary Day Modal ── -->
+<div class="modal-overlay" id="diary-modal" onclick="overlayClick(event,'diary-modal')">
+  <div class="modal-box wide">
+    <div class="modal-title" id="diary-modal-date"></div>
+    <div id="diary-modal-body"></div>
+    <div class="form-footer">
+      <button class="btn btn-ghost" onclick="closeModal('diary-modal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Stats Modal ── -->
+<div class="modal-overlay" id="stats-modal" onclick="overlayClick(event,'stats-modal')">
+  <div class="modal-box">
+    <div class="modal-title">统计信息</div>
+    <div id="stats-body"><div class="loading">加载中…</div></div>
+    <div class="form-footer">
+      <button class="btn btn-ghost" onclick="closeModal('stats-modal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+let allMemories = []
+let currentCategory = ''
+let currentKeyword = ''
+let currentView = 'list'
+let calYear = new Date().getFullYear()
+let calMonth = new Date().getMonth()
+let selectedMood = ''
+let searchTimer = null
+
+const CAT_NAME = { deep:'深层', daily:'日常', diary:'日记', knowledge:'知识' }
+const MOOD_LABEL = { happy:'😊 开心', sad:'😢 难过', calm:'😌 平静', excited:'🤩 兴奋', anxious:'😰 焦虑' }
+const MONTHS = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月']
+
+// ── Boot ───────────────────────────────────────────────────────────────────────
+fetchAll()
+
+async function fetchAll() {
+  try {
+    const res = await fetch('/api/memories')
+    allMemories = await res.json()
+    renderAll()
+  } catch {
+    document.getElementById('memory-list').innerHTML =
+      `<div class="empty-state"><div class="ei">⚠️</div><p>无法连接服务，请确认 <code>node web.js</code> 已运行</p></div>`
+  }
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────────
+function renderAll() {
+  updateCounts()
+  if (currentView === 'list') renderList()
+  else renderCalendar()
+}
+
+function updateCounts() {
+  document.getElementById('ct-all').textContent = allMemories.length
+  ;['deep','daily','diary','knowledge'].forEach(c =>
+    document.getElementById(`ct-${c}`).textContent = allMemories.filter(m => m.category === c).length
+  )
+}
+
+function renderList() {
+  const kw = currentKeyword.toLowerCase()
+  let list = allMemories.filter(m => {
+    if (currentCategory && m.category !== currentCategory) return false
+    if (kw && !m.content.toLowerCase().includes(kw) && !m.tags.some(t => t.toLowerCase().includes(kw))) return false
+    return true
+  })
+
+  const el = document.getElementById('memory-list')
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state"><div class="ei">🌿</div><p>${kw ? '没有找到匹配的记忆' : '还没有记忆，写入第一条吧'}</p></div>`
+    return
+  }
+
+  el.innerHTML = list.map(m => {
+    const d = new Date(m.timestamp)
+    const ds = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+    const footer = [
+      m.mood ? `<span class="mood-badge ${m.mood}">${MOOD_LABEL[m.mood]}</span>` : '',
+      m.tags.map(t => `<span class="tag">#${t}</span>`).join(''),
+      m.expires_at ? `<span class="expires-badge">⏱ ${daysLeft(m.expires_at)} 天后过期</span>` : '',
+      m.source && m.source !== 'web' ? `<span class="source-badge">${esc(m.source)}</span>` : '',
+    ].filter(Boolean).join('')
+
+    return `<div class="memory-card">
+      <div class="card-header">
+        <span class="cat-badge ${m.category}">${CAT_NAME[m.category]}</span>
+        <div class="card-meta">
+          <span class="card-time">${ds}</span>
+          <div class="card-actions">
+            <button class="icon-btn" onclick="openEdit('${m.id}')" title="编辑">✏️</button>
+            <button class="icon-btn danger" onclick="deleteMem('${m.id}')" title="删除">🗑</button>
+          </div>
+        </div>
+      </div>
+      <div class="card-content">${esc(m.content)}</div>
+      ${footer ? `<div class="card-footer">${footer}</div>` : ''}
+    </div>`
+  }).join('')
+}
+
+function renderCalendar() {
+  document.getElementById('cal-title').textContent = `${calYear}年 ${MONTHS[calMonth]}`
+
+  const firstDow = (new Date(calYear, calMonth, 1).getDay() + 6) % 7 // Mon=0
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate()
+
+  // diary entries this month grouped by day
+  const byDay = {}
+  allMemories.forEach(m => {
+    if (m.category !== 'diary') return
+    const d = new Date(m.timestamp)
+    if (d.getFullYear() !== calYear || d.getMonth() !== calMonth) return
+    const day = d.getDate()
+    if (!byDay[day]) byDay[day] = []
+    byDay[day].push(m)
+  })
+
+  const today = new Date()
+  const isNow = today.getFullYear() === calYear && today.getMonth() === calMonth
+
+  let cells = Array(firstDow).fill(`<div class="cal-cell"></div>`)
+  for (let day = 1; day <= daysInMonth; day++) {
+    const entries = byDay[day] || []
+    const mood = entries[0]?.mood || (entries.length ? 'none' : null)
+    const isToday = isNow && today.getDate() === day
+    cells.push(`<div class="cal-cell ${isToday ? 'today' : ''} ${entries.length ? 'has-diary' : ''}"
+        ${entries.length ? `onclick="openDiaryDay(${day})"` : ''}>
+      <span class="cal-day-num">${day}</span>
+      ${mood ? `<span class="mood-dot ${mood}"></span>` : ''}
+    </div>`)
+  }
+  document.getElementById('cal-grid').innerHTML = cells.join('')
+}
+
+// ── Filter / View ──────────────────────────────────────────────────────────────
+function setCategory(btn, cat) {
+  currentCategory = cat
+  document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  renderAll()
+}
+function setView(btn, view) {
+  currentView = view
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  document.getElementById('list-view').style.display = view === 'list' ? '' : 'none'
+  document.getElementById('calendar-view').style.display = view === 'calendar' ? '' : 'none'
+  renderAll()
+}
+function debounceSearch(val) {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => { currentKeyword = val; renderList() }, 220)
+}
+function calNav(dir) {
+  calMonth += dir
+  if (calMonth < 0)  { calMonth = 11; calYear-- }
+  if (calMonth > 11) { calMonth = 0;  calYear++ }
+  renderCalendar()
+}
+
+// ── Write / Edit ───────────────────────────────────────────────────────────────
+function openWrite(cat = '') {
+  document.getElementById('write-title').textContent = '写入记忆'
+  document.getElementById('edit-id').value = ''
+  document.getElementById('f-content').value = ''
+  document.getElementById('f-category').value = cat || 'deep'
+  document.getElementById('f-source').value = 'web'
+  document.getElementById('f-tags').value = ''
+  document.getElementById('f-expires').value = '7'
+  selectedMood = ''
+  document.querySelectorAll('.mood-opt').forEach(b => b.classList.remove('sel'))
+  onCategoryChange()
+  openModal('write-modal')
+  setTimeout(() => document.getElementById('f-content').focus(), 100)
+}
+
+function openEdit(id) {
+  const m = allMemories.find(x => x.id === id)
+  if (!m) return
+  document.getElementById('write-title').textContent = '编辑记忆'
+  document.getElementById('edit-id').value = id
+  document.getElementById('f-content').value = m.content
+  document.getElementById('f-category').value = m.category
+  document.getElementById('f-source').value = m.source || 'web'
+  document.getElementById('f-tags').value = m.tags.join(', ')
+  selectedMood = m.mood || ''
+  document.querySelectorAll('.mood-opt').forEach(b =>
+    b.classList.toggle('sel', b.classList.contains(m.mood || '__'))
+  )
+  onCategoryChange()
+  openModal('write-modal')
+}
+
+function onCategoryChange() {
+  const cat = document.getElementById('f-category').value
+  document.getElementById('mood-group').style.display    = cat === 'diary'  ? '' : 'none'
+  document.getElementById('expires-group').style.display = cat === 'daily'  ? '' : 'none'
+}
+
+function pickMood(mood) {
+  selectedMood = mood
+  document.querySelectorAll('.mood-opt').forEach(b => b.classList.remove('sel'))
+  document.querySelector(`.mood-opt.${mood}`).classList.add('sel')
+}
+
+async function submitMemory() {
+  const id       = document.getElementById('edit-id').value
+  const content  = document.getElementById('f-content').value.trim()
+  const category = document.getElementById('f-category').value
+  const source   = document.getElementById('f-source').value.trim() || 'web'
+  const tags     = document.getElementById('f-tags').value
+    .split(/[,，]/).map(t => t.trim()).filter(Boolean)
+  const expires_days = parseInt(document.getElementById('f-expires').value) || 7
+  if (!content) { alert('请输入内容'); return }
+
+  const body = { content, category, tags, source, expires_days,
+    ...(selectedMood && { mood: selectedMood }) }
+
+  try {
+    if (id) {
+      await fetch(`/api/memories/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })
+    } else {
+      await fetch('/api/memories',       { method:'POST',  headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) })
+    }
+    closeModal('write-modal')
+    await fetchAll()
+  } catch(e) { alert('保存失败: ' + e.message) }
+}
+
+async function deleteMem(id) {
+  const m = allMemories.find(x => x.id === id)
+  if (!confirm(`确定删除这条${CAT_NAME[m?.category]||''}记忆？`)) return
+  await fetch(`/api/memories/${id}`, { method:'DELETE' })
+  await fetchAll()
+}
+
+// ── Diary Day ──────────────────────────────────────────────────────────────────
+function openDiaryDay(day) {
+  const entries = allMemories.filter(m => {
+    if (m.category !== 'diary') return false
+    const d = new Date(m.timestamp)
+    return d.getFullYear() === calYear && d.getMonth() === calMonth && d.getDate() === day
+  })
+  if (!entries.length) return
+
+  document.getElementById('diary-modal-date').textContent =
+    `${calYear}年${calMonth+1}月${day}日`
+
+  document.getElementById('diary-modal-body').innerHTML = entries.map((m, i) => `
+    <div class="diary-entry">
+      <div class="diary-meta">
+        ${m.mood ? `<span class="mood-badge ${m.mood}">${MOOD_LABEL[m.mood]}</span>` : ''}
+        <span class="diary-time">${new Date(m.timestamp).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}</span>
+        ${m.tags.map(t => `<span class="tag">#${t}</span>`).join('')}
+      </div>
+      <div class="diary-body">${esc(m.content)}</div>
+    </div>
+  `).join('')
+
+  openModal('diary-modal')
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────────
+async function openStats() {
+  openModal('stats-modal')
+  document.getElementById('stats-body').innerHTML = '<div class="loading">加载中…</div>'
+  try {
+    const s = await (await fetch('/api/stats')).json()
+    const catColors = { deep:'var(--deep)', daily:'var(--daily)', diary:'var(--diary)', knowledge:'var(--knowledge)' }
+    document.getElementById('stats-body').innerHTML = `
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-num">${s.total}</div><div class="stat-label">总记忆数</div></div>
+        ${Object.entries(s.by_category).map(([c,n]) =>
+          `<div class="stat-card"><div class="stat-num" style="color:${catColors[c]}">${n}</div><div class="stat-label">${CAT_NAME[c]}</div></div>`
+        ).join('')}
+      </div>
+      ${s.all_tags.length ? `
+        <div class="form-group">
+          <label>所有标签</label>
+          <div class="tags-cloud">${s.all_tags.map(t=>`<span class="tag">#${t}</span>`).join('')}</div>
+        </div>` : ''}
+    `
+  } catch { document.getElementById('stats-body').innerHTML = '<p style="color:var(--muted)">加载失败</p>' }
+}
+
+// ── Modals ─────────────────────────────────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open') }
+function closeModal(id) { document.getElementById(id).classList.remove('open') }
+function overlayClick(e, id) { if (e.target.classList.contains('modal-overlay')) closeModal(id) }
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'))
+})
+
+// ── Utils ──────────────────────────────────────────────────────────────────────
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+function pad(n) { return String(n).padStart(2,'0') }
+function daysLeft(at) { return Math.max(0, Math.ceil((new Date(at)-Date.now())/86400000)) }
+</script>
+</body>
+</html>
