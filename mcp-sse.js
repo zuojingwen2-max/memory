@@ -2,7 +2,7 @@ import express from "express";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { CallToolRequestSchema, ListToolsRequestSchema, isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID } from "crypto";
 import pg from "pg";
 
@@ -148,7 +148,7 @@ function createMcpServer() {
         case "read_memory": {
           let memories = await load();
           if (args.category) memories = memories.filter(m => m.category === args.category);
-          if (args.tags?.length) memories = memories.filter(m => args.tags.every(t => m.tags.includes(t)));
+          if (args.tags?.length) memories = memories.filter(m => args.tags.every(tag => m.tags.includes(tag)));
           if (args.keyword) memories = memories.filter(m => m.content.includes(args.keyword));
           memories = memories.slice(0, args.limit ?? 50);
           return t(`找到 ${memories.length} 条记忆\n${JSON.stringify(memories, null, 2)}`);
@@ -159,7 +159,7 @@ function createMcpServer() {
           let memories = await load();
           memories = memories.filter(m =>
             m.content.toLowerCase().includes(q) ||
-            m.tags.some(t => t.toLowerCase().includes(q)) ||
+            m.tags.some(tag => tag.toLowerCase().includes(q)) ||
             (m.source ?? "").toLowerCase().includes(q)
           );
           if (args.category) memories = memories.filter(m => m.category === args.category);
@@ -211,14 +211,14 @@ function createMcpServer() {
   return server;
 }
 
-// ─── Express + SSE ─────────────────────────────────────────────────────────────
+// ─── Express ─────────────────────────────────────────────────────────────────
 const app = express();
 app.use(express.json());
 
 // CORS
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "*");
   if (req.method === "OPTIONS") return res.sendStatus(200);
   next();
@@ -226,9 +226,89 @@ app.use((req, res, next) => {
 
 app.get("/health", (_, res) => res.json({ ok: true }));
 
-const sessions = new Map();
+// ─── Streamable HTTP transport (/mcp) ────────────────────────────────────────
+const streamableSessions = new Map();
+
+app.post("/mcp", async (req, res) => {
+  console.log("POST /mcp received");
+  const sessionId = req.headers["mcp-session-id"];
+  let transport;
+
+  try {
+    if (sessionId && streamableSessions.has(sessionId)) {
+      // Reuse existing transport
+      transport = streamableSessions.get(sessionId);
+      await transport.handleRequest(req, res, req.body);
+    } else if (!sessionId && isInitializeRequest(req.body)) {
+      // New initialization request
+      transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+      });
+      const mcpServer = createMcpServer();
+
+      transport.onclose = () => {
+        const sid = transport.sessionId;
+        if (sid) streamableSessions.delete(sid);
+        console.log(`Session closed: ${sid}`);
+      };
+
+      await mcpServer.connect(transport);
+      await transport.handleRequest(req, res, req.body);
+
+      const sid = transport.sessionId;
+      if (sid) {
+        streamableSessions.set(sid, transport);
+        console.log(`New session: ${sid}`);
+      }
+    } else {
+      // Invalid request
+      res.status(400).json({
+        jsonrpc: "2.0",
+        error: { code: -32600, message: "Bad Request: No valid session or initialize request" },
+        id: null,
+      });
+    }
+  } catch (err) {
+    console.error("Error in POST /mcp:", err);
+    if (!res.headersSent) {
+      res.status(500).json({
+        jsonrpc: "2.0",
+        error: { code: -32603, message: "Internal server error" },
+        id: null,
+      });
+    }
+  }
+});
+
+app.get("/mcp", async (req, res) => {
+  console.log("GET /mcp received");
+  const sessionId = req.headers["mcp-session-id"];
+  if (sessionId && streamableSessions.has(sessionId)) {
+    const transport = streamableSessions.get(sessionId);
+    await transport.handleRequest(req, res);
+  } else {
+    res.status(405).set("Allow", "POST").send("Method Not Allowed");
+  }
+});
+
+app.delete("/mcp", async (req, res) => {
+  console.log("DELETE /mcp received");
+  const sessionId = req.headers["mcp-session-id"];
+  if (sessionId && streamableSessions.has(sessionId)) {
+    const transport = streamableSessions.get(sessionId);
+    await transport.close();
+    streamableSessions.delete(sessionId);
+    res.status(200).send("Session terminated");
+  } else {
+    res.status(404).send("Session not found");
+  }
+});
+
+// ─── Legacy SSE transport (/sse + /messages) ─────────────────────────────────
+const sseSessions = new Map();
 
 app.get("/sse", async (req, res) => {
+  console.log("GET /sse received");
   if (TOKEN && req.query.token !== TOKEN) {
     return res.status(401).send("Unauthorized");
   }
@@ -236,34 +316,21 @@ app.get("/sse", async (req, res) => {
   res.setHeader("X-Accel-Buffering", "no");
   const transport = new SSEServerTransport("/messages", res);
   const mcpServer = createMcpServer();
-  sessions.set(transport.sessionId, transport);
-  res.on("close", () => sessions.delete(transport.sessionId));
+  sseSessions.set(transport.sessionId, transport);
+  res.on("close", () => sseSessions.delete(transport.sessionId));
   await mcpServer.connect(transport);
 });
 
 app.post("/messages", async (req, res) => {
-  const transport = sessions.get(req.query.sessionId);
+  const transport = sseSessions.get(req.query.sessionId);
   if (!transport) return res.status(404).json({ error: "session not found" });
   await transport.handlePostMessage(req, res);
 });
 
-// ─── Streamable HTTP (stateless) ───────────────────────────────────────────────
-app.post("/mcp", async (req, res) => {
-  if (TOKEN && req.headers["authorization"] !== `Bearer ${TOKEN}`) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-  const mcpServer = createMcpServer();
-  await mcpServer.connect(transport);
-  await transport.handleRequest(req, res, req.body);
-  res.on("close", () => {
-    transport.close();
-    mcpServer.close();
-  });
-});
-
-// ─── Start ─────────────────────────────────────────────────────────────────────
+// ─── Start ───────────────────────────────────────────────────────────────────
 await initDB();
 app.listen(PORT, () => {
-  console.log(`\n🔌 MCP SSE 服务已启动 → http://localhost:${PORT}/sse\n`);
+  console.log(`\n🔌 MCP 服务已启动 → http://localhost:${PORT}`);
+  console.log(`   Streamable HTTP: /mcp`);
+  console.log(`   Legacy SSE: /sse\n`);
 });
